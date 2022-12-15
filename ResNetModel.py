@@ -14,7 +14,6 @@ def downsample_basic_block(input, out_channels, stride):
         zero_pads = zero_pads.cuda()
     out = Variable(torch.cat([out.data, zero_pads], dim=1))
     return out
-# avg_pool3d(input4d, kernel_size, stride=None, padding=0, ceil_mode=False, count_include_pad=True, divisor_override=None)
 
 # =======================================
 class BasicBlock(nn.Module):
@@ -69,11 +68,9 @@ class Bottleneck(nn.Module):
         out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
-
         out = self.conv2(out)
         out = self.bn2(out)
         out = self.relu(out)
-
         out = self.conv3(out)
         out = self.bn3(out)
 
@@ -91,7 +88,6 @@ class ResNet(nn.Module):
     def __init__(self,
                  block,
                  layers,
-                 shortcut_type='A',
                  num_classes=2):
 
         self.input = 64
@@ -117,17 +113,10 @@ class ResNet(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
-    def _make_layer(self, block, out_channels, blocks, shortcut_type, stride=1):
+    def _make_layer(self, block, out_channels, blocks, stride=1):
         downsample = None
         if stride != 1 or self.input != out_channels * block.expansion:
-            if shortcut_type == 'A':
-                downsample = partial(downsample_basic_block, planes=out_channels * block.expansion, stride=stride)
-            else:
-                downsample = nn.Sequential(nn.Conv3d(self.input,
-                                                     out_channels * block.expansion,
-                                                     kernel_size=(1, 1, 1),
-                                                     stride=stride,
-                                                     bias=False), nn.BatchNorm3d(out_channels * block.expansion))
+            downsample = partial(downsample_basic_block, planes=out_channels * block.expansion, stride=stride)
 
         layers = []
         layers.append(block(self.input, out_channels, stride, downsample))
