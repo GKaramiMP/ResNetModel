@@ -1,3 +1,4 @@
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,9 +7,9 @@ from functools import partial
 import math
 import numpy as np
 
-# ===========================================
-def downsample_basic_block(input, out_channels, stride):
-    out = F.avg_pool3d(input, kernel_size=1, stride=stride)
+# =======================================
+def downsample_basic_block(in_channels, out_channels, stride):
+    out = F.avg_pool3d(in_channels, kernel_size=1, stride=stride)
     zero_pads = torch.Tensor(out.size(0), out_channels - out.size(1), out.size(2), out.size(3), out.size(4)).zero_()
     if isinstance(out.data, torch.cuda.FloatTensor):
         zero_pads = zero_pads.cuda()
@@ -19,13 +20,12 @@ def downsample_basic_block(input, out_channels, stride):
 class BasicBlock(nn.Module):
     expansion = 1
     def __init__(self,
-                 input,
+                 in_channels,
                  out_channels,
                  stride=1,
                  downsample=None):
-
         super(BasicBlock, self).__init__()
-        self.conv1 = torch.nn.Conv3d(input, out_channels, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=1, bias=False)
+        self.conv1 = torch.nn.Conv3d(in_channels, out_channels, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=1, bias=False)
         self.bn1 = nn.BatchNorm3d(out_channels)
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = torch.nn.Conv3d(out_channels, out_channels, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=1, bias=False)
@@ -47,42 +47,6 @@ class BasicBlock(nn.Module):
         return out
 
 # ==========================================
-class Bottleneck(nn.Module):
-    expansion = 4
-
-    def __init__(self, input, out_channels, stride=1, downsample=None):
-        super(Bottleneck, self).__init__()
-        self.conv1 = nn.Conv3d(input, out_channels, kernel_size=(1, 1, 1), bias=False)
-        self.bn1 = nn.BatchNorm3d(out_channels)
-        self.conv2 = nn.Conv3d(out_channels, out_channels, kernel_size=(3, 3, 3), stride=stride, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm3d(out_channels)
-        self.conv3 = nn.Conv3d(out_channels, out_channels * 4, kernel_size=(1, 1, 1), bias=False)
-        self.bn3 = nn.BatchNorm3d(out_channels * 4)
-        self.relu = nn.ReLU(inplace=True)
-        self.downsample = downsample
-        self.stride = stride
-
-    def forward(self, x):
-        residual = x
-
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-        out = self.conv2(out)
-        out = self.bn2(out)
-        out = self.relu(out)
-        out = self.conv3(out)
-        out = self.bn3(out)
-
-        if self.downsample is not None:
-            residual = self.downsample(x)
-
-        out += residual
-        out = self.relu(out)
-
-        return out
-
-# ==========================================
 class ResNet(nn.Module):
 
     def __init__(self,
@@ -97,10 +61,10 @@ class ResNet(nn.Module):
         self.bn1 = nn.BatchNorm3d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool3d(kernel_size=(3, 3, 3), stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0], shortcut_type)
-        self.layer2 = self._make_layer(block, 128, layers[1], shortcut_type, stride=2)
-        self.layer3 = self._make_layer(block, 256, layers[2], shortcut_type, stride=2)
-        self.layer4 = self._make_layer(block, 512, layers[3], shortcut_type, stride=2)
+        self.layer1 = self._make_layer(block, 64, layers[0])
+        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
         last_duration = int(math.ceil(self.sample_duration / 16))
         last_size = int(math.ceil(self.input / 32))
         self.avgpool = nn.AvgPool3d((last_duration, last_size, last_size), stride=1)
